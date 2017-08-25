@@ -1,12 +1,38 @@
-#############################
-#                           #
-#   Basic Security Camera   #
-#       By Lucas Frey       #
-#                           #
-#############################
+# /************************************************************************************
+# **                                                                                 **
+# **  MIT License                                                                    **
+# **                                                                                 **
+# **  Copyright (c) 2017 Lucas Frey                                                  **
+# **                                                                                 **
+# **  Permission is hereby granted, free of charge, to any person obtaining          **
+# **  a copy of this software and associated documentation files (the "Software"),   **
+# **  to deal in the Software without restriction, including without limitation      **
+# **  the rights to use, copy, modify, merge, publish, distribute, sublicense,       **
+# **  and/or sell copies of the Software, and to permit persons to whom the          **
+# **  Software is furnished to do so, subject to the following conditions:           **
+# **                                                                                 **
+# **  The above copyright notice and this permission notice shall be included        **
+# **  in all copies or substantial portions of the Software.                         **
+# **                                                                                 **
+# **  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS        **
+# **  OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,    **
+# **  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE    **
+# **  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER         **
+# **  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,  **
+# **  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE  **
+# **  SOFTWARE.                                                                      **
+# **                                                                                 **
+# ************************************************************************************/
+ #############################
+ #                           #
+ #   Basic Security Camera   #
+ #       By Lucas Frey       #
+ #                           #
+ #############################
 import numpy as np
 import cv2
 import time
+
 from datetime import datetime
 
 # Global variables
@@ -25,6 +51,7 @@ num_non_zeros = 0
 cannyMin = 80
 cannyMax = 255
 threshMin = 20
+
 threshMax = 255
 minPixels = 1000
 kernel7 = np.ones((5, 5), np.uint8)
@@ -75,7 +102,6 @@ def detector():
 def nothing(x):
     x = x
     return x
-
 # Create a black image, a window
 img = np.zeros((300, 512, 3), np.uint8)
 cv2.namedWindow('image')
@@ -84,7 +110,8 @@ cv2.createTrackbar('cannyMin', 'image', 0, 255, nothing)
 cv2.createTrackbar('cannyMax', 'image', 0, 255, nothing)
 cv2.createTrackbar('threshMin', 'image', 10, 255, nothing)
 cv2.createTrackbar('threshMax', 'image', 255, 255, nothing)
-cv2.createTrackbar('minPixels', 'image', 1000, 10000, nothing)
+
+cv2.createTrackbar('minPixels', 'image', 500, 10000, nothing)
 
 # update the trackbars
 # (NOTE: currently unused. Program is currently reading trackbars from main)
@@ -166,6 +193,7 @@ while True:
     cv2.bitwise_or(resized_threshold, older_resized_threshold.copy(), resized_threshold)
     cv2.erode(resized_threshold, kernel3, resized_threshold)
     #cv2.dilate(resized_threshold, kernel5, resized_threshold)
+
     cv2.imshow('threshold', resized_threshold)
 
     # Create canny image
@@ -207,11 +235,11 @@ while True:
             start_recording = True
         if start_recording is True and 8 >= count_frames > 0:
             count_frames += 1
-            out.write(movement)
             # cv2.putText(movement, 'Size of blobs: ' + str(num_non_zeros), (5, 40), font, .75, (0, 255, 0), 2)
             str_date = str(datetime.now())
             cv2.putText(movement, str_date, (5, 20), font, .75, (0, 0, 255), 3)
             cv2.putText(movement, str_date, (5, 20), font, .75, (255, 0, 0), 1)
+            out.write(movement)
             cv2.putText(movement, 'Press R to stop', (5, 40), font, .75, (150, 255, 50), 2)
             #thresh_to_write = cv2.cvtColor(resized_threshold.copy(),  cv2.COLOR_GRAY2BGR)
             #out_thresh.write(resized_threshold)
@@ -227,22 +255,37 @@ while True:
             cv2.putText(movement, 'Recording is off', (5, 20), font, .75, (0, 0, 255), 2)
             cv2.putText(movement, 'Press R to record', (5, 40), font, .75, (0, 0, 255), 2)
             cv2.putText(movement, 'Press Q to quit', (5, 60), font, .75, (0, 0, 255), 2)
+
         count_frames = 0
         start_recording = False
 
     # Show frames
     cv2.imshow("movement", movement)
     # cv2.imshow('gray', gray2)
-    # cv2.imshow('canny', img_canny)
+
+    cv2.imshow('canny', img_canny)
     cv2.imshow('threshold', resized_threshold)
 
     # Push frames into older time slots
+
     frame1 = frame2Copy.copy()
     older_gray = old_gray.copy()
     old_gray = gray1.copy()
     gray1 = gray2.copy()
     older_difference = difference_copy.copy()
     older_resized_threshold = resized_threshold_copy.copy()
+
+    # Keyboard commands
+    #   R = Allow/Disallow recording
+    #   Q = Quit
+    key = cv2.waitKey(1)
+    if key == ord('r'):
+        if can_record is False:
+            can_record = True
+        else:
+            can_record = False
+    if key == ord('q'):
+        break
 
 # Release everything if job is finished
 out.release()
