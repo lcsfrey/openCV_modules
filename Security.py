@@ -275,18 +275,6 @@ while True:
     older_difference = difference_copy.copy()
     older_resized_threshold = resized_threshold_copy.copy()
 
-    # Keyboard commands
-    #   R = Allow/Disallow recording
-    #   Q = Quit
-    key = cv2.waitKey(1)
-    if key == ord('r'):
-        if can_record is False:
-            can_record = True
-        else:
-            can_record = False
-    if key == ord('q'):
-        break
-
 # Release everything if job is finished
 out.release()
 cap.release()
