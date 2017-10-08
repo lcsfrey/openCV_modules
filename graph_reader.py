@@ -1,6 +1,3 @@
-import threading
-import tkinter as tk
-
 import MyCamera as webcam
 import cv2
 import numpy as np
@@ -87,12 +84,6 @@ detector = detector()
 
 
 while True:
-    #app.mainloop()
-    capture.tick()
-    t_frame1_copy = capture.getFrame("color")
-    t_grey_blurred = capture.getFrame("grey_blurred")
-    t_img_canny = capture.getFrame("canny")
-    t_gray_threshold = capture.getFrame("gray_threshold")
 
     frame1_copy = t_frame1_copy.copy()
     grey_blurred = t_grey_blurred.copy()
@@ -184,6 +175,7 @@ while True:
 
     cv2.imshow("threshold", gray_threshold)
     if cv2.waitKey(1) & 0xFF == ord('q'):
+        cv2.imwrite("img.jpeg", frame1_copy)
         break
     if cv2.waitKey(1) & 0xFF == ord('g'):
         display_images = True
@@ -198,6 +190,5 @@ while True:
         cv2.imshow("canny", img_canny)
 
 # Release everything if job is finished
-#cap.release()
-#out.release()
+out.release()
 cv2.destroyAllWindows()
