@@ -175,7 +175,7 @@ while True:
 
     cv2.imshow("threshold", gray_threshold)
     if cv2.waitKey(1) & 0xFF == ord('q'):
-        cv2.imwrite("img.jpeg", frame1_copy)
+        cv2.imwrite("last_frame.jpeg", frame1_copy)
         break
     if cv2.waitKey(1) & 0xFF == ord('g'):
         display_images = True
