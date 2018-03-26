@@ -93,10 +93,7 @@ class MyVideoWriter:
     def __init__(self, camera_number, output_file):
         self.out = None
         self.can_record = False
-
-    def camera_intialize(self):
-        if self.can_record is True:
-            self.out = start_recording()
+        
 
     # Read in number to use for new file name
     # Initialize recording
@@ -122,9 +119,6 @@ class MyVideoWriter:
         myfile.close()
         return out
 
-
-
-
-
-
-
+    def camera_intialize(self):
+        if self.can_record is True:
+            self.out = MyVideoWriter.start_recording()
