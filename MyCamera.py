@@ -19,11 +19,14 @@ class MyCamera:
         ret, self.frame4 = self.cap.read()
         self.frame_count = 0
         self.grey = self.frame1.copy()
-        self.cannyMin = 100
-        self.cannyMax = 128
-        self.threshMin = 127
-        self.threshMax = 255
-        self.minPixels = 1000
+        
+        # frame conversion properties
+        self.FONT = cv2.FONT_HERSHEY_SIMPLEX
+        self.cannyMin = 30
+        self.cannyMax = 150
+        self.threshMin = 40
+        self.threshMax = 220
+        self.minPixels = 500
 
         # Create a black image, a window
         # img = np.zeros((300, 512, 3), np.uint8)
@@ -39,8 +42,6 @@ class MyCamera:
         cv2.createTrackbar('cannyMax', 'image', self.cannyMax, 255, nothing)
         cv2.createTrackbar('threshMin', 'image', self.threshMin, 255, nothing)
         cv2.createTrackbar('threshMax', 'image', self.threshMax, 255, nothing)
-        cv2.createTrackbar('MIN_PIXELS', 'image', 1000, 5000, nothing)
-        cv2.createTrackbar('MAX_PIXELS', 'image', 1000, 5000, nothing)
 
     # Process frame and output the result
     # input:  string indicating what image to get
@@ -61,7 +62,7 @@ class MyCamera:
 
     def getCannyFrame(self, image=None, dilation_kernel=(3,3), dilation_iterations=1, 
                     canny_min=None, canny_max = None):
-        canny = cv2.Canny(self.grey.copy(), self.cannyMin, self.cannyMax)
+        canny = cv2.Canny(self.getGreyFrame(), self.cannyMin, self.cannyMax)
         for i in range (dilation_iterations):
             canny = cv2.dilate(canny, dilation_kernel)
         return canny
@@ -74,12 +75,6 @@ class MyCamera:
         threshold = cv2.dilate(threshold, (3, 3))
         return threshold
 
-    def getGreyThresholdFrame(self, image=None, min_thresh=None, max_thresh=None):
-        t_gray2 = cv2.cvtColor(self.frame2.copy(), cv2.COLOR_BGR2GRAY)
-        #difference = cv2.absdiff(t_gray1, t_gray2)
-        ret, threshold = cv2.threshold(t_gray2, self.threshMin, self.threshMax, cv2.THRESH_BINARY)
-        cv2.bitwise_not(threshold, threshold)
-        return threshold
 
     # get current positions of trackbars
     def process_trackbars(self):
@@ -87,9 +82,11 @@ class MyCamera:
         self.cannyMax = cv2.getTrackbarPos('cannyMax', 'image')
         self.threshMin = cv2.getTrackbarPos('threshMin', 'image')
         self.threshMax = cv2.getTrackbarPos('threshMax', 'image')
-        self.MIN_PIXELS = cv2.getTrackbarPos('MIN_PIXELS', 'image')
-        self.MAX_PIXELS = cv2.getTrackbarPos('MAX_PIXELS', 'image')
 
+    def display_text(self, image, text, color=(0, 0, 255)):
+        cv2.putText(image, text, (5, self.text_display_offset), self.FONT, .75, color, 2)
+        self.text_display_offset += 20
+        
     # update frames
     def tick(self):
         self.frame4 = self.frame3
@@ -97,6 +94,7 @@ class MyCamera:
         self.frame2 = self.frame1
         ret, self.frame1 = self.cap.read()
         self.frame_count += 1
+        self.text_display_offset = 20
         self.process_trackbars()
 
     def processKey(self, key):
@@ -107,8 +105,7 @@ class MyCamera:
 class MyVideoWriter:
     def __init__(self, camera_number, output_file):
         self.out = None
-        self.can_record = False
-        
+        self.can_record = true
 
     # Read in number to use for new file name
     # Initialize recording
@@ -136,4 +133,26 @@ class MyVideoWriter:
 
     def camera_intialize(self):
         if self.can_record is True:
-            self.out = MyVideoWriter.start_recording()
+            self.out = start_recording()
+
+def main():
+    camera = MyCamera(0, "output")
+    key = ''
+    while True:
+        key = cv2.waitKey(1)
+        if key == ord('q'):
+            break
+        else:
+            camera.processKey(key)
+
+        camera.tick()
+        color_frame = camera.getColorFrame()
+        threshold = camera.getThresholdFrame()
+        canny = camera.getCannyFrame()
+
+        frame_names = ["color", "threshold", "canny"]
+        frames = [color_frame, threshold, canny]
+        showFrames(frame_names, frames)
+
+if __name__ == "__main__":
+    main()
