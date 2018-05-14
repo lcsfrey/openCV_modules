@@ -33,15 +33,26 @@ class TCPClientProtocol:
     receive image from server
     '''
     def recv_img(self):
+        image_byte_size = b''
+        current = self.sock.recv(1)
+        print(current)
+        if current == b'X': 
+            return None
+
+        while current != b'|':
+            image_byte_size += current
+            current = self.sock.recv(1)
+            
+            
+
+        image_byte_size = int(image_byte_size)
+
         data = b''
-        packet_size = 1024
-        image_byte_size = 640 * 480 * 3
-        while image_byte_size > 0:
-            if image_byte_size >= packet_size:
-                data += self.sock.recv(packet_size)
-            else:
-                data += self.sock.recv(image_byte_size)
-            image_byte_size -= packet_size
+        packet_size = 2048
+        while len(data) < image_byte_size:
+            packet_size = min(2048, image_byte_size - len(data))
+            data += self.sock.recv(packet_size)
+
         return cv2.imdecode(pickle.loads(data), cv2.IMREAD_COLOR)
 
 
@@ -53,8 +64,7 @@ def main():
     try:
         connection = TCPClientProtocol()
         connection.connect()
-        image = connection.recv_img()
-
+        
     except Exception as e:
         print("ERROR: " + str(e))
         return
@@ -63,7 +73,10 @@ def main():
         k = cv2.waitKey(1)
         if k == ord('q'):
             break
-        
+        image = connection.recv_img()
+
+        if image is None:
+            break
         cv2.imshow("CLIENT: Frame received", image)
 
 if __name__ == "__main__":

@@ -24,51 +24,62 @@ class TCPServerProtocol:
     
     def listen(self):
         self.sock.bind((self.host, self.port))
-        print("listening on port: " + str(self.port))
+        print("listening on port:", self.port)
         self.sock.listen(1)
 
     def accept(self):
         print("Waiting for connection...")
         self.client, self.client_address = self.sock.accept()    
-        print("Connection acquired. Address: " + str(self.client_address))
+        print("Connection acquired. Address:", self.client_address)
 
+
+    """ sends a message of the form "img_length|img" """
     def send(self, image):
         ret, img_buf = cv2.imencode('.jpg', image)
-        self.client.sendall(pickle.dumps(img_buf))
-        print("SERVER: message sent")
+        img_buf = pickle.dumps(img_buf)
+        length = str(len(img_buf)) + '|'
+        img_buf = bytes(length, 'utf-8') + img_buf
+        self.client.sendall(img_buf)
+
+    def closeClientConnection(self):
+        self.client.sendall(b'X')
 
 # Main while loop
 def main():
     print("Server opened")
 
-    def display(image, message=None):
+    def display(image, message="Image"):
         if message is not None:
             font = cv2.FONT_HERSHEY_COMPLEX
             color = (255, 0, 255)
             cv2.putText(image, message, (5,15), font, .7, color, 1, cv2.LINE_AA)
+            cv2.imshow(message,image)
 
 
-    WEBCAM = MyCamera(0, "outstream_file")
-
-    color_frame = None
-    while True:
-        k = cv2.waitKey(1)
-        if k == ord('q'):
-            break
-        WEBCAM.tick()
-        color_frame = WEBCAM.getFrame("color")
-        display(color_frame.copy(), 'Press q to take picture to send')
-        
+    WEBCAM = MyCamera(0)
 
     try:
         connection = TCPServerProtocol()
         connection.listen()
         connection.accept()
-        connection.send(color_frame)
-
+        
     except Exception as e:
         print("ERROR: " + str(e))
         return
+
+    while True:
+        k = cv2.waitKey(1)
+        if k == ord('q'):
+            break
+
+        WEBCAM.tick()
+        color_frame = WEBCAM.getColorFrame()
+        display(color_frame.copy(), 'Press q to take picture to send')
+        connection.send(color_frame)
+    
+    connection.closeClientConnection()
+
+
 
 if __name__ == "__main__":
     main()
