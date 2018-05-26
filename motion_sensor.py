@@ -23,27 +23,16 @@
 # **  SOFTWARE.                                                                      **
 # **                                                                                 **
 # ************************************************************************************/
- #############################
- #                           #
- #   Basic Security Camera   #
- #       By Lucas Frey       #
- #                           #
- #############################
-import cv2
-import numpy as np
-import time
-import os
-from datetime import datetime
-from MyCamera import *
-THIS_FOLDER = os.path.dirname(os.path.abspath(__file__))
 
+from datetime import datetime
+import cv2
+from MyCamera import MyCamera, showFrames
 
 # Read in number to use for new file name
 # Initialize recording
 # returns a file writing object
 def getRecordCount():
-    myfile = None
-    filecount = -1
+    THIS_FOLDER = os.path.dirname(os.path.abspath(__file__))
     countfile = os.path.join(THIS_FOLDER, 'output_count.txt')
 
     # Check if file exists and read in current  it if it does
@@ -52,156 +41,103 @@ def getRecordCount():
         filecount = myfile.read()
         int_filecount = int(filecount)
     else:
-        myfile = open(countfile, 'w+')
-    myfile.close()
-
-    if int_filecount is -1:
         int_filecount = 0
+    myfile.close()
 
     # define codec and filename
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
-    str_filecount = str(int_filecount)
-    filename = 'movement_@_'
-    mytime = time.strftime("  %d_%b_%Y_%x")
+    filename = 'movement_%d_@_' % (int_filecount)
+    mytime = time.strftime("%d_%b_%Y_%x")
     filename = filename + mytime + '.avi'
 
     # increment avi filecount and store it back to output_count.txt
     out = cv2.VideoWriter(filename, fourcc, 20.0, (640, 480))
-    int_filecount = int_filecount + 1
-    myfile = open('output_count.txt', 'w')
-    str_filecount = str(int_filecount)
-    myfile.write(str_filecount)
-    myfile.close()
+    with open(countfile, 'w') as myfile:
+        myfile.write(str(int_filecount + 1))
     return out
 
 class MotionSensor(MyCamera):
 
-    def __init__(self, camera_number, output_file):
-        MyCamera.__init__(self, camera_number, output_file)
-  
+    def __init__(self, camera_number):
+        MyCamera.__init__(self, camera_number, display_trackbars=True)
+        # define movement_frame sensitivity
+        self.min_pixels = 2000
+        self.max_pixels = 20000
+        self.blob_area = 0
         self.text_display_offset = 15
-        # Needed to initialize trackbars
+        # Saves movement_frame to file if can_record is True
+        self.can_record = False
+        self.start_recording = False
+
+        # get current positions of trackbars
         def nothing(x):
             x = x
-            return x 
+            return x
 
-        cv2.createTrackbar('MIN_PIXELS', 'image', 1100, 5000, nothing)
-        cv2.createTrackbar('MAX_PIXELS', 'image', 10000, 5000, nothing)
+        cv2.createTrackbar('min_pixels', self.trackbar_window_name, self.min_pixels, 5000, nothing)
+        cv2.createTrackbar('max_pixels', self.trackbar_window_name, self.max_pixels, 30000, nothing)
 
-        # Global variables
-        # define movement sensitivity
-        self.MIN_PIXELS = 200
-        self.MAX_PIXELS = 8000
-        self.blob_area = 0
-
-        # Saves movement to file if CAN_RECORD is True
-        self.CAN_RECORD = False
-        self.start_recording = False
-        
-        self.out_num = getRecordCount()
-        #out_thresh = start_recording()
-
-            # Initialize blob detector
-            # returns a blob detector
-        def detector():
-            params = cv2.SimpleBlobDetector_Params()
-            # Change thresholds
-            params.minThreshold = self.threshMin
-            params.maxThreshold = self.threshMax
-            # Filter by Area.
-            params.filterByArea = True
-            params.minArea = self.minPixels
-
-            detector = cv2.SimpleBlobDetector_create(params)
-            return detector
-
-        self.detector = detector()
-
-    def getTotalChangeValue(self):
+    def getDifferenceValue(self):
         return self.blob_area
 
+    def movementFound(self):
+        if self.max_pixels > self.blob_area > self.min_pixels:
+            return True
 
-    def find_movement(self):
-        thresh_contours = self.getThresholdFrame().copy()
-        _, cnts, hierarchy = cv2.findContours(thresh_contours, cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
-        max_size_contour = None
+    def findMovementFrame(self):
+        """ Returns image with movement_frame in frame outlined """
 
-        # determines the how much the next line of text is offset when
-        # a line of text is printed
-        offset = 20
+        movement_frame = self.getColorFrame()
+        threshold_frame = self.getThresholdFrame(dilation_iterations=3)
+        _, cnts, hierarchy = cv2.findContours(threshold_frame, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-        movement = self.getColorFrame()
+        num_non_zeros = cv2.countNonZero(threshold_frame)
+        self.blob_area = num_non_zeros
+        blob_size = "blob size = " + str(self.blob_area)
+
+        str_date = str(datetime.now())
+        self.display_text(movement_frame, str_date, (255, 255, 0))
+        self.display_text(movement_frame, blob_size, (0, 0, 255))
+    
+        if self.can_record is True:
+            self.display_text(movement_frame, 'Recording is on', (255, 255, 0))
+            self.display_text(movement_frame, 'Press R to stop', (150, 255, 50))
+        else:
+            self.display_text(movement_frame, 'Recording is off', (150, 255, 50))
+            self.display_text(movement_frame, 'Press R to record', (150, 255, 50))
+
+        if self.max_pixels > num_non_zeros > self.min_pixels:
+            self.start_recording = True
+            self.display_text(movement_frame, "movement_frame found!", (0, 255, 0))
 
         # for every contour
         for cnt in cnts:
             contour_area = cv2.contourArea(cnt)
-            if self.MAX_PIXELS > contour_area > self.MIN_PIXELS:
-                cv2.drawContours(movement, cnt, -1, (0, 0, 255), 3)
-                
+            if self.movementFound():
+                cv2.drawContours(movement_frame, cnt, -1, (0, 0, 255), 3)
 
-        num_non_zeros = cv2.countNonZero(self.getThresholdFrame())
-        self.blob_area = num_non_zeros
-        blob_size = "blob size = " + str(self.blob_area)
-        self.display_text(movement, blob_size, (0, 0, 255))
-        # if recording has been enabled
-        #   count the area of white pixels in the threshold
-        #   if threshold image shows a large amount of white pixels(when there's movement on the screen),
-        #       start recording
-        #       print the amount of white pixels
-        #       activate recording
-        #   if we can record
-        #       write frame to file
-        # else
-        #   prints that recording is turned off
-        if self.CAN_RECORD is True:
-            if self.MAX_PIXELS > num_non_zeros > self.MIN_PIXELS:
-                self.frame_count = 0
-                self.start_recording = True
-                self.display_text(movement, "movement found!", (0, 255, 0))
-            if self.start_recording is True and 15 >= self.frame_count > 0:
-                # cv2.putText(movement, 'Size of blobs: ' + str(num_non_zeros), (5, 40), FONT, .75, (0, 255, 0), 2)
-                str_date = str(datetime.now())
-                print(str_date)
-                color = (255, 255, 0)
-                self.display_text(movement, str_date, color)
-                self.out.write(movement)
+        return movement_frame
 
-                self.display_text(movement, 'Press R to stop', (150, 255, 50))
-                # thresh_to_write = cv2.cvtColor(resized_threshold.copy(),  cv2.COLOR_GRAY2BGR)
-                # out_thresh.write(resized_threshold)
-            else:
-                self.display_text(movement, 'Recording is on', (255, 255, 0))
-                self.frame_count = 0
-                self.start_recording = False
-        else:
-            if self.CAN_RECORD is False:
-                self.display_text(movement, 'Recording is off', (150, 255, 50))
-                self.display_text(movement, 'Press R to record', (150, 255, 50))
 
-            self.start_recording = False
-        
-        return movement
-
-        # get current positions of trackbars
-    
+    # get current positions of trackbars
     def process_trackbars(self):
         MyCamera.process_trackbars(self)
-        self.MIN_PIXELS = cv2.getTrackbarPos('MIN_PIXELS', 'image')
-        self.MAX_PIXELS = cv2.getTrackbarPos('MAX_PIXELS', 'image')
+        self.min_pixels = cv2.getTrackbarPos('min_pixels', self.trackbar_window_name)
+        self.max_pixels = cv2.getTrackbarPos('max_pixels', self.trackbar_window_name)
 
-    def processKey(self, key):  
-        MyCamera.processKey(self, key)
+
+    def processKey(self, key):
         if key == ord('r'):
-            if self.CAN_RECORD is False:
-                self.CAN_RECORD = True
+            if self.can_record is False:
+                self.can_record = True
                 print("Recording turned on")
             else:
-                self.CAN_RECORD = False
+                self.can_record = False
                 print("Recording turned off")
 
 
 def main():
-    motion = MotionSensor(0, "output")
+    motion = MotionSensor(0)
     key = ''
     while True:
         key = cv2.waitKey(1)
@@ -212,11 +148,11 @@ def main():
 
         motion.tick()
         color_frame = motion.getColorFrame()
-        threshold = motion.getThresholdFrame()
-        movement = motion.find_movement()
+        threshold_frame = motion.getThresholdFrame(dilation_iterations=3)
+        movement_frame = motion.findMovementFrame()
 
-        frame_names = ["color", "threshold", "movement"]
-        frames = [color_frame, threshold, movement]
+        frame_names = ["threshold_frame", "movement_frame"]
+        frames = [threshold_frame, movement_frame]
         showFrames(frame_names, frames)
 
 if __name__ == "__main__":
